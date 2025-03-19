@@ -10,6 +10,7 @@
  * The game transactions are on the Starknet blockchain.
  */
 
+import 'dotenv/config';
 import { anthropic } from "@ai-sdk/anthropic";
 import { openai } from "@ai-sdk/openai";
 import {
@@ -35,7 +36,19 @@ import { string, z } from "zod";
 import { constants } from '@underware_gg/pistols-sdk/pistols/gen';
 import { getContractByName } from '@dojoengine/core';
 import { makeDojoAppConfig, NetworkId, make_moves_hash } from '@underware_gg/pistols-sdk/pistols';
-import { bigintToHex, stringToFelt} from '@underware_gg/pistols-sdk/utils';
+import { bigintToHex} from '@underware_gg/pistols-sdk/utils';
+import { stringToFelt} from '@underware_gg/pistols-sdk/utils/starknet';
+import {
+  GraphQLResponse,
+  PlayerResponse,
+  TokenBalancesResponse,
+  ChallengesResponse,
+  RoundsResponse,
+  DuelistData,
+  DuelHistory,
+  ChallengeData,
+  RoundData
+} from './types.js';
 
 // Log startup message
 console.log("Starting Pistols at Dawn Dream Agent...");
@@ -183,18 +196,6 @@ Remember to:
 `;
 
 // Define interfaces for type safety
-interface DuelistData {
-  duelist_id: string;
-  name: string;
-  archetype: string;
-  image_url: string;
-  metadata: any;
-  life_count?: number;
-  is_alive?: boolean;
-  fame_balance?: number;
-  is_inactive?: boolean;
-}
-
 interface PackData {
   pack_id: string;
   pack_type: string;
@@ -247,11 +248,11 @@ interface PistolsState {
   playerAddress: string;
   duelistId: string;
   activeChallenge: string;
-  activeChallenges: Challenge[];
+  activeChallenges: ChallengeData[];
   challengeState: string;
   isRegistered: boolean;
   starterPackClaimed: boolean;
-  duelResults: any[];
+  duelResults: DuelHistory;
   playerDuelists: DuelistData[];
   playerPacks: PackData[];
   committedMoves: {
@@ -306,7 +307,7 @@ const pistolsContexts = context({
       challengeState: "",
       isRegistered: false,
       starterPackClaimed: false,
-      duelResults: [],
+      duelResults: { rounds: [], totalDuels: 0, lastAnalyzed: 0 },
       playerDuelists: [],
       playerPacks: [],
       committedMoves: {},
@@ -352,7 +353,7 @@ function parseDuelistMetadata(tokenMetadata: any): DuelistData {
 /**
  * Helper function to query the Pistols GraphQL API
  */
-async function queryPistolsAPI(query: string, variables = {}) {
+async function queryPistolsAPI<T>(query: string, variables = {}): Promise<GraphQLResponse<T>> {
   const response = await fetch(env.PISTOLS_GRAPHQL_URL, {
     method: "POST",
     headers: {
@@ -368,7 +369,7 @@ async function queryPistolsAPI(query: string, variables = {}) {
     throw new Error(`API request failed with status ${response.status}`);
   }
 
-  return await response.json();
+  return await response.json() as GraphQLResponse<T>;
 }
 
 const pistolsExtension = extension({
@@ -413,7 +414,7 @@ const pistolsExtension = extension({
               }
             `;
          
-            const result = await queryPistolsAPI(query);
+            const result = await queryPistolsAPI<PlayerResponse>(query);
             const state = ctx.agentMemory as PistolsState;
             const playerData = result.data?.pistolsPlayerModels?.edges?.[0]?.node;
             
@@ -423,7 +424,7 @@ const pistolsExtension = extension({
             state.isRegistered = isRegistered;
             state.starterPackClaimed = hasClaimedStarterPack;
             
-            let playerDuelists = [];
+            let playerDuelists: DuelistData[] = [];
             
             if (state.starterPackClaimed) {
               console.log(`Querying duelists for player: ${playerAddress}`);
@@ -452,7 +453,7 @@ const pistolsExtension = extension({
                   }
                 `;
                 
-                const result = await queryPistolsAPI(query);
+                const result = await queryPistolsAPI<TokenBalancesResponse>(query);
                 
               // Process duelists
                 const duelistTokens = result?.data?.tokenBalances?.edges
@@ -914,14 +915,16 @@ const pistolsExtension = extension({
               }
           }`;
             
-            const result = await queryPistolsAPI(query);
+            const result = await queryPistolsAPI<ChallengesResponse>(query);
             
-          const challengesAsA = result.data?.addressAChallenges?.edges?.map((edge: { 
-            node: Challenge 
-          }) => edge.node) || [];
-          const challengesAsB = result.data?.addressBChallenges?.edges?.map((edge: { 
-            node: Challenge 
-          }) => edge.node) || [];
+          const challengesAsA = result.data?.addressAChallenges?.edges?.map((edge: { node: ChallengeData }) => ({
+            ...edge.node,
+            duelist_id: edge.node.duelist_id_a
+          }));
+          const challengesAsB = result.data?.addressBChallenges?.edges?.map((edge: { node: ChallengeData }) => ({
+            ...edge.node,
+            duelist_id: edge.node.duelist_id_b
+          }));
           
             const challenges = [...challengesAsA, ...challengesAsB];
             
@@ -953,9 +956,7 @@ const pistolsExtension = extension({
             
             state.activeChallenges = activeChallenges.map((challenge: Challenge): Challenge => ({
               ...challenge,
-              duelist_id: playerAddress === challenge.address_a 
-                ? challenge.duelist_id_a 
-                : challenge.duelist_id_b
+              duelist_id: challenge.duelist_id_a
             }));
             
             const currentChallenge = activeChallenges[0];
@@ -963,9 +964,7 @@ const pistolsExtension = extension({
             state.challengeState = currentChallenge.state;
             
             if (currentChallenge.state === constants.ChallengeState.InProgress) {
-              state.duelistId = playerAddress === currentChallenge.address_a 
-                ? currentChallenge.duelist_id_a 
-                : currentChallenge.duelist_id_b;
+              state.duelistId = currentChallenge.duelist_id_a;
             }
             }
             
@@ -1490,7 +1489,7 @@ const pistolsExtension = extension({
             }
           }`;
 
-          const playersResult = await queryPistolsAPI(playersQuery);
+          const playersResult = await queryPistolsAPI<PlayerResponse>(playersQuery);
           
           // Get all player addresses and remove ours
           const playerAddresses = playersResult.data?.pistolsPlayerModels?.edges
@@ -1507,9 +1506,12 @@ const pistolsExtension = extension({
           }
 
           // If targetAddress is provided and valid, use it, otherwise pick random
-          let targetAddress = call.data.targetAddress;
+          let targetAddress: string | undefined = call.data.targetAddress;
           if (!targetAddress || !playerAddresses.includes(normalizeStarknetAddress(targetAddress))) {
             targetAddress = playerAddresses[Math.floor(Math.random() * playerAddresses.length)];
+          }
+          if (!targetAddress) {
+            throw new Error("No valid target address found");
           }
           targetAddress = normalizeStarknetAddress(targetAddress);
 
@@ -1528,7 +1530,16 @@ const pistolsExtension = extension({
             }
           }`;
           
-          const challengesResult = await queryPistolsAPI(challengesQuery);
+          const challengesResult = await queryPistolsAPI<{
+            challenges: {
+              edges: Array<{
+                node: {
+                  duelist_id_a: string;
+                  duelist_id_b: string;
+                }
+              }>
+            }
+          }>(challengesQuery);
           
           // Track busy duelists
           const busyDuelists = new Set<string>();
@@ -1563,7 +1574,7 @@ const pistolsExtension = extension({
             }
           }`;
           
-          const duelistsResult = await queryPistolsAPI(duelistsQuery);
+          const duelistsResult = await queryPistolsAPI<TokenBalancesResponse>(duelistsQuery);
           
           // Process duelists with metadata
           const duelistTokens = duelistsResult.data?.tokenBalances?.edges
@@ -1577,7 +1588,7 @@ const pistolsExtension = extension({
           // Parse metadata and filter out busy/dead duelists
           const availableDuelists = duelistTokens
             .map(parseDuelistMetadata)
-            .filter(duelist => 
+            .filter((duelist: DuelistData) => 
               duelist.is_alive && 
               !duelist.is_inactive && 
               !busyDuelists.has(duelist.duelist_id)
@@ -1585,7 +1596,7 @@ const pistolsExtension = extension({
 
           // If no available duelists, try another player
           if (availableDuelists.length === 0) {
-            const remainingPlayers = playerAddresses.filter(addr => addr !== targetAddress);
+            const remainingPlayers = playerAddresses.filter((addr: string) => addr !== targetAddress);
             if (remainingPlayers.length > 0) {
               return this.handler({
                 ...call,
@@ -1593,7 +1604,7 @@ const pistolsExtension = extension({
                   ...call.data,
                   targetAddress: remainingPlayers[Math.floor(Math.random() * remainingPlayers.length)]
                 }
-              }, ctx, agent);
+              }, ctx, agent as any);
             }
             return {
               success: true,
@@ -1736,8 +1747,8 @@ const pistolsExtension = extension({
           }`;
 
           const [challengesResult, roundsResult] = await Promise.all([
-            queryPistolsAPI(challengesQuery),
-            queryPistolsAPI(roundsQuery)
+            queryPistolsAPI<ChallengesResponse>(challengesQuery),
+            queryPistolsAPI<RoundsResponse>(roundsQuery)
           ]);
 
           // Process challenges
@@ -1759,11 +1770,14 @@ const pistolsExtension = extension({
 
           // Filter and process rounds that belong to our duels
           const ourRounds = (roundsResult.data?.pistolsRoundModels?.edges || [])
-            .map(edge => edge.node)
-            .filter(round => duelMap.has(round.duel_id))
-            .map(round => {
+            .map((edge: { node: RoundData }) => edge.node)
+            .filter((round: RoundData) => duelMap.has(round.duel_id))
+            .map((round: RoundData) => {
               const duelInfo = duelMap.get(round.duel_id);
-                  return {
+              if (!duelInfo) {
+                throw new Error(`No duel info found for round ${round.duel_id}`);
+              }
+              return {
                 duel_id: round.duel_id,
                 playerMoves: duelInfo.isPlayerA ? round.moves_a : round.moves_b,
                 opponentMoves: duelInfo.isPlayerA ? round.moves_b : round.moves_a,
@@ -1780,7 +1794,7 @@ const pistolsExtension = extension({
             rounds: ourRounds,
             totalDuels: ourChallenges.length,
             lastAnalyzed: Date.now()
-          };
+          } as DuelHistory;
           
           return {
             success: true,

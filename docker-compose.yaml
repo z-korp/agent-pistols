@@ -1,0 +1,13 @@
+services:
+  chroma:
+    image: chromadb/chroma:0.6.3
+    container_name: daydreams_chroma
+    restart: always
+    ports:
+      - "8000:8000"
+  mongo:
+    image: mongo:8.0.4
+    container_name: daydreams_mongo
+    restart: always
+    ports:
+      - "27017:27017"

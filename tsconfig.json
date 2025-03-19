@@ -15,10 +15,17 @@
     "sourceMap": true,
     "lib": ["ES2022"],
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "baseUrl": ".",
+    "paths": {
+      "@ai-sdk/*": ["node_modules/@ai-sdk/*"],
+      "@daydreamsai/*": ["node_modules/@daydreamsai/*"],
+      "@underware_gg/*": ["node_modules/@underware_gg/*"]
+    }
   },
   "include": [
-    "*.ts"
+    "*.ts",
+    "types.ts"
   ],
   "exclude": [
     "node_modules",

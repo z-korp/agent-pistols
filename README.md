@@ -10,12 +10,27 @@ An AI agent that plays the Pistols at Dawn game on Starknet. The agent, named Ti
 - MongoDB (optional, for persistent storage)
 - ChromaDB (optional, for vector storage)
 
+## Docker Setup
+
+If you want to use MongoDB and ChromaDB for persistent storage and vector storage, you can set up the required services using Docker:
+
+```bash
+# Start MongoDB and ChromaDB containers
+docker-compose up -d
+```
+
+This will start:
+- MongoDB on port 27017
+- ChromaDB on port 8000
+
+
 ## Setup
 
-1. Clone the repository:
+1. Clone the repository and its dependencies:
 ```bash
 git clone <repository-url>
 cd agent-pistols
+git clone <pistols-sdk-url> ../pistols/sdk
 ```
 
 2. Install dependencies:
@@ -72,6 +87,14 @@ pnpm watch
 - Persistent memory storage with MongoDB
 - Vector storage with ChromaDB
 - Advanced AI decision making
+
+
+### Debug Mode
+
+To enable debug logging, set the following environment variable:
+```bash
+DEBUG=* pnpm dev
+```
 
 ## License
 
