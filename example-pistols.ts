@@ -34,9 +34,8 @@ import { cli } from "@daydreamsai/core/extensions";
 import { string, z } from "zod";
 import { constants } from '@underware_gg/pistols-sdk/pistols/gen';
 import { getContractByName } from '@dojoengine/core';
-import { makeDojoAppConfig, NetworkId, make_moves_hash } from '@underware/pistols-sdk/pistols';
+import { makeDojoAppConfig, NetworkId, make_moves_hash } from '@underware_gg/pistols-sdk/pistols';
 import { bigintToHex, stringToFelt} from '@underware_gg/pistols-sdk/utils';
-import { PackType, PACK_TYPES } from './constants';
 
 // Log startup message
 console.log("Starting Pistols at Dawn Dream Agent...");

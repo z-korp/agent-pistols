@@ -1,0 +1,29 @@
+{
+  "name": "agent-pistols",
+  "version": "1.0.0",
+  "description": "Pistols at Dawn AI Agent",
+  "main": "dist/example-pistols.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/example-pistols.js",
+    "dev": "ts-node-esm example-pistols.ts",
+    "watch": "tsc -w"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^1.1.15",
+    "@ai-sdk/openai": "^1.2.1",
+    "@daydreamsai/core": "^0.2.16",
+    "@daydreamsai/chromadb": "^0.2.16",
+    "@daydreamsai/discord": "^0.2.16",
+    "@daydreamsai/defai": "^0.2.16",
+    "zod": "^3.24.2",
+    "@underware_gg/pistols-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "ts-node": "latest",
+    "typescript": "latest",
+    "@types/node-fetch": "latest"
+  }
+} 
