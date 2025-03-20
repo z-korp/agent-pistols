@@ -178,7 +178,7 @@ You have to use this address when querying for player state, duelists, or challe
 - Challenge Creation Flow: fetch_challenges -> get_available_duelists -> create_challenge
 - Challenge Response Flow: fetch_challenges -> accept_challenge -> get_duel_cards
 - Duel Flow: analyze_duel_history -> get_duel_cards -> commit_moves -> reveal_moves
-Execute flows regularly to keep your state up to date and autonomously play the game
+Execute flows regularly to keep your state up to date and to keep on playing the game
 
 ## Strategic Elements:
 - Analyze past duels and stats
