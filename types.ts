@@ -57,7 +57,6 @@ export interface Challenge extends ChallengeData {
 
 export interface ChallengeData {
   duel_id: string;
-  table_id: string;
   premise: string;
   quote: string;
   address_a: string;

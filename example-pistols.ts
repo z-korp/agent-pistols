@@ -33,11 +33,10 @@ import { StarknetChain } from "@daydreamsai/defai";
 import { discord } from "@daydreamsai/discord";
 import { cli } from "@daydreamsai/core/extensions";
 import { string, z } from "zod";
-import { constants } from '@underware_gg/pistols-sdk/pistols/gen';
+import { constants, models } from '@underware/pistols-sdk/pistols/gen';
 import { getContractByName } from '@dojoengine/core';
-import { makeDojoAppConfig, NetworkId, make_moves_hash } from '@underware_gg/pistols-sdk/pistols';
-import { bigintToHex} from '@underware_gg/pistols-sdk/utils';
-import { stringToFelt} from '@underware_gg/pistols-sdk/utils/starknet';
+import { makeDojoAppConfig, NetworkId, make_moves_hash } from '@underware/pistols-sdk/pistols';
+import { bigintToHex} from '@underware/pistols-sdk/utils';
 import {
   GraphQLResponse,
   PlayerResponse,
@@ -208,7 +207,6 @@ interface Challenge {
   duel_id: string;
   state: string;
   duelist_id: string;
-  table_id: string;
   premise: string;
   quote: string;
   address_a: string;
@@ -872,7 +870,6 @@ const pistolsExtension = extension({
                 edges {
                   node {
                     duel_id
-                    table_id
                     premise
                     quote
                     address_a
@@ -897,7 +894,6 @@ const pistolsExtension = extension({
                 edges {
                   node {
                     duel_id
-                    table_id
                     premise
                     quote
                     address_a
@@ -1014,8 +1010,8 @@ const pistolsExtension = extension({
               contractAddress: duel_contract.address,
               entrypoint: 'reply_duel',
               calldata: [
-                duelistId,
                 challengeId,
+                duelistId,
                 '1'           // accepted (1 for true)
               ]
             });
@@ -1095,23 +1091,22 @@ const pistolsExtension = extension({
             premiseValue = value !== undefined ? value.toString() : call.data.premise;
           }
             
-          const tableId = bigintToHex(stringToFelt(constants.TABLES.PRACTICE));
+          const duelType = constants.getDuelTypeValue(constants.DuelType.Practice) as number;
           const expireHours = call.data.expireHours || 24;
           const livesStaked = call.data.livesStaked || 1;
-          
-          const quoteFelt = bigintToHex(stringToFelt(call.data.quote));
+          const message = call.data.quote;
           
           const createResponse = await starknetChain.write({
             contractAddress: duel_contract.address,
             entrypoint: 'create_duel',
             calldata: [
+              duelType,
               duelistId,
               challengedAddress,
-              premiseValue,
-              quoteFelt,
-              tableId,
+              livesStaked,
               expireHours.toString(),
-              livesStaked
+              premiseValue,
+              message,
             ]
           });
           
@@ -1129,7 +1124,6 @@ const pistolsExtension = extension({
             duel_id: duelId,
             state: constants.ChallengeState.Awaiting,
             duelist_id: duelistId,
-            table_id: tableId,
             premise: premiseValue,
             quote: call.data.quote,
             address_a: playerAddress,
